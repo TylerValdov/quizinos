@@ -1,0 +1,32 @@
+@import "tailwindcss";
+
+@theme {
+  --color-brand: #4255ff;
+  --color-brand-dark: #2f3fd6;
+}
+
+html, body, #root {
+  height: 100%;
+}
+
+body {
+  background-color: #f4f6fb;
+  color: #1c1d1f;
+}
+
+.flip-card-inner {
+  transition: transform 0.5s;
+  transform-style: preserve-3d;
+}
+
+.flip-card-inner.flipped {
+  transform: rotateY(180deg);
+}
+
+.flip-card-face {
+  backface-visibility: hidden;
+}
+
+.flip-card-face.back {
+  transform: rotateY(180deg);
+}
