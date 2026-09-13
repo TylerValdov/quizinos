@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 export default function Layout({ children }: { children: ReactNode }) {
+  const { user, signOut } = useAuth();
+
   return (
     <div className="min-h-screen flex flex-col">
       <header className="border-b border-slate-200 bg-white sticky top-0 z-10">
@@ -19,6 +22,15 @@ export default function Layout({ children }: { children: ReactNode }) {
             >
               + Create set
             </Link>
+            {user && (
+              <button
+                onClick={() => void signOut()}
+                title={user.email ?? undefined}
+                className="rounded-md border border-slate-300 px-3 py-1.5 font-medium hover:bg-slate-50"
+              >
+                Sign out
+              </button>
+            )}
           </nav>
         </div>
       </header>

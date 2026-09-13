@@ -1,9 +1,23 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  collection,
+  deleteDoc,
+  doc,
+  onSnapshot,
+  orderBy,
+  query,
+  setDoc,
+  updateDoc,
+} from 'firebase/firestore';
 import type { Card, StudySet } from '../types';
-import { loadSets, saveSets, makeId, clearProgress } from '../lib/storage';
+import { db } from '../lib/firebase';
+import { makeId } from '../lib/id';
+import { clearProgress } from '../lib/firestoreProgress';
+import { useAuth } from './AuthContext';
 
 interface SetsContextValue {
   sets: StudySet[];
+  loading: boolean;
   getSet: (id: string) => StudySet | undefined;
   createSet: (title: string, description: string, cards: Card[]) => StudySet;
   updateSet: (id: string, patch: Partial<Pick<StudySet, 'title' | 'description' | 'cards'>>) => void;
@@ -13,15 +27,34 @@ interface SetsContextValue {
 const SetsContext = createContext<SetsContextValue | null>(null);
 
 export function SetsProvider({ children }: { children: ReactNode }) {
-  const [sets, setSets] = useState<StudySet[]>(() => loadSets());
+  const { user } = useAuth();
+  const uid = user?.uid;
+  const [sets, setSets] = useState<StudySet[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    saveSets(sets);
-  }, [sets]);
+    if (!uid) {
+      setSets([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    const q = query(collection(db, 'users', uid, 'sets'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(
+      q,
+      (snapshot) => {
+        setSets(snapshot.docs.map((d) => d.data() as StudySet));
+        setLoading(false);
+      },
+      () => setLoading(false),
+    );
+    return unsubscribe;
+  }, [uid]);
 
   const value = useMemo<SetsContextValue>(
     () => ({
       sets,
+      loading,
       getSet: (id) => sets.find((s) => s.id === id),
       createSet: (title, description, cards) => {
         const now = Date.now();
@@ -33,20 +66,20 @@ export function SetsProvider({ children }: { children: ReactNode }) {
           createdAt: now,
           updatedAt: now,
         };
-        setSets((prev) => [newSet, ...prev]);
+        if (uid) void setDoc(doc(db, 'users', uid, 'sets', newSet.id), newSet);
         return newSet;
       },
       updateSet: (id, patch) => {
-        setSets((prev) =>
-          prev.map((s) => (s.id === id ? { ...s, ...patch, updatedAt: Date.now() } : s)),
-        );
+        if (!uid) return;
+        void updateDoc(doc(db, 'users', uid, 'sets', id), { ...patch, updatedAt: Date.now() });
       },
       deleteSet: (id) => {
-        setSets((prev) => prev.filter((s) => s.id !== id));
-        clearProgress(id);
+        if (!uid) return;
+        void deleteDoc(doc(db, 'users', uid, 'sets', id));
+        void clearProgress(uid, id);
       },
     }),
-    [sets],
+    [sets, loading, uid],
   );
 
   return <SetsContext.Provider value={value}>{children}</SetsContext.Provider>;

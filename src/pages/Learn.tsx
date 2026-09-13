@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSets } from '../context/SetsContext';
-import { loadProgress, saveProgress, clearProgress } from '../lib/storage';
+import { useAuth } from '../context/AuthContext';
+import { loadProgress, saveProgress, clearProgress } from '../lib/firestoreProgress';
 import {
   buildQuestion,
   buildRoundQueue,
@@ -36,24 +37,38 @@ function pickNext(cards: Card[], q: string[], prog: LearnProgress): QueueState {
 export default function Learn() {
   const { id } = useParams();
   const { getSet } = useSets();
+  const { user } = useAuth();
+  const uid = user?.uid;
   const set = id ? getSet(id) : undefined;
 
-  const [progress, setProgress] = useState<LearnProgress | null>(() => {
-    if (!set) return null;
-    const stored = loadProgress(set.id);
-    return stored ? reconcileProgress(stored, set.cards) : initLearnProgress(set.id, set.cards, 'term-to-def');
-  });
-
-  const [state, setState] = useState<QueueState>(() => {
-    if (!set || !progress) return { queue: [], question: null };
-    return pickNext(set.cards, buildRoundQueue(set.cards, progress), progress);
-  });
+  const [progress, setProgress] = useState<LearnProgress | null>(null);
+  const [state, setState] = useState<QueueState>({ queue: [], question: null });
+  const [progressLoading, setProgressLoading] = useState(true);
 
   const [writtenInput, setWrittenInput] = useState('');
   const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
   const [revealedAnswer, setRevealedAnswer] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [sessionAnswers, setSessionAnswers] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    if (!uid || !set) return;
+    setProgressLoading(true);
+    loadProgress(uid, set.id).then((stored) => {
+      if (cancelled) return;
+      const prog = stored
+        ? reconcileProgress(stored, set.cards)
+        : initLearnProgress(set.id, set.cards, 'term-to-def');
+      setProgress(prog);
+      setState(pickNext(set.cards, buildRoundQueue(set.cards, prog), prog));
+      setProgressLoading(false);
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uid, set?.id]);
 
   const total = set?.cards.length ?? 0;
   const mastered = useMemo(
@@ -63,8 +78,8 @@ export default function Learn() {
 
   const restart = useCallback(
     (direction: StudyDirection) => {
-      if (!set) return;
-      clearProgress(set.id);
+      if (!set || !uid) return;
+      void clearProgress(uid, set.id);
       const fresh = initLearnProgress(set.id, set.cards, direction);
       setProgress(fresh);
       setState(pickNext(set.cards, buildRoundQueue(set.cards, fresh), fresh));
@@ -74,7 +89,7 @@ export default function Learn() {
       setLocked(false);
       setSessionAnswers(0);
     },
-    [set],
+    [set, uid],
   );
 
   if (!set) {
@@ -99,10 +114,12 @@ export default function Learn() {
     );
   }
 
-  if (!progress) return null;
+  if (progressLoading || !progress) {
+    return <div className="text-center text-slate-400 py-16 text-sm">Loading…</div>;
+  }
 
   function commitAnswer(correct: boolean, answerShown: string) {
-    if (!state.question || locked || !progress || !set) return;
+    if (!state.question || locked || !progress || !set || !uid) return;
     setLocked(true);
     setFeedback(correct ? 'correct' : 'incorrect');
     setRevealedAnswer(answerShown);
@@ -111,7 +128,7 @@ export default function Learn() {
     const cardId = state.question.cardId;
     const newProgress = recordAnswer(progress, cardId, correct);
     setProgress(newProgress);
-    saveProgress(newProgress);
+    saveProgress(uid, newProgress);
 
     let newQueue = state.queue;
     if (!correct) {

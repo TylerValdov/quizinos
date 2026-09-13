@@ -1,0 +1,20 @@
+rules_version = '2';
+
+// Every document lives under /users/{uid}/... . A request may only touch
+// its own uid's subtree, and only when signed in — so even if this app's
+// public config or source were inspected, there is nothing to read or
+// write without a valid session for that exact account. Because the app
+// itself has no sign-up flow, the only account that can ever exist is the
+// one you create by hand in the Firebase console, so this one rule is
+// effectively "only that one person, period."
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/{document=**} {
+      allow read, write: if request.auth != null && request.auth.uid == uid;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}
