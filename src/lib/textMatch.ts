@@ -39,3 +39,13 @@ export function isAnswerCorrect(input: string, answer: string): boolean {
   if (b.length >= 5 && levenshtein(a, b) <= 1) return true;
   return false;
 }
+
+/**
+ * Used for the "retype the correct answer" gate after a miss — no typo
+ * tolerance here, since the point is to make sure it's typed exactly right.
+ */
+export function isExactMatch(input: string, answer: string): boolean {
+  const a = normalize(input);
+  if (!a) return false;
+  return a === normalize(answer);
+}

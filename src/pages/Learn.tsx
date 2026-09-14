@@ -13,7 +13,7 @@ import {
   recordAnswer,
   type LearnQuestion,
 } from '../lib/learnEngine';
-import { isAnswerCorrect } from '../lib/textMatch';
+import { isAnswerCorrect, isExactMatch } from '../lib/textMatch';
 import type { LearnProgress, StudyDirection } from '../types';
 import type { Card } from '../types';
 
@@ -52,6 +52,9 @@ export default function Learn() {
   const [locked, setLocked] = useState(false);
   const [sessionAnswers, setSessionAnswers] = useState(0);
   const [canOverride, setCanOverride] = useState(false);
+  const [needsRetype, setNeedsRetype] = useState(false);
+  const [retypeValue, setRetypeValue] = useState('');
+  const [retypeError, setRetypeError] = useState(false);
 
   // Holds everything needed to advance once "Next question" is clicked, and
   // to recompute the answer if it gets overridden to correct in the meantime.
@@ -90,6 +93,9 @@ export default function Learn() {
     setFeedback(null);
     setRevealedAnswer(null);
     setCanOverride(false);
+    setNeedsRetype(false);
+    setRetypeValue('');
+    setRetypeError(false);
     setLocked(false);
     pendingQueueRef.current = null;
     progressBeforeAnswerRef.current = null;
@@ -141,6 +147,7 @@ export default function Learn() {
     setFeedback(correct ? 'correct' : 'incorrect');
     setRevealedAnswer(answerShown);
     setCanOverride(!correct && allowOverride);
+    setNeedsRetype(!correct);
     setSessionAnswers((n) => n + 1);
 
     const cardId = state.question.cardId;
@@ -184,7 +191,18 @@ export default function Learn() {
     saveProgress(uid, corrected);
     setFeedback('correct');
     setCanOverride(false);
+    setNeedsRetype(false);
     pendingQueueRef.current = baseQueueRef.current;
+  }
+
+  function handleRetypeSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!state.question) return;
+    if (isExactMatch(retypeValue, state.question.answer)) {
+      handleNext();
+    } else {
+      setRetypeError(true);
+    }
   }
 
   function handleNext() {
@@ -332,7 +350,7 @@ export default function Learn() {
             </div>
           )}
 
-          {feedback && (
+          {feedback === 'correct' && (
             <button
               onClick={handleNext}
               autoFocus
@@ -340,6 +358,35 @@ export default function Learn() {
             >
               Next question →
             </button>
+          )}
+
+          {feedback === 'incorrect' && needsRetype && (
+            <form onSubmit={handleRetypeSubmit} className="mt-4 space-y-2">
+              <label className="block text-xs text-slate-500">
+                Type the correct answer above to continue
+              </label>
+              <input
+                autoFocus
+                value={retypeValue}
+                onChange={(e) => {
+                  setRetypeValue(e.target.value);
+                  setRetypeError(false);
+                }}
+                placeholder="Type it exactly as shown"
+                className={`w-full rounded-md border px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-brand ${
+                  retypeError ? 'border-red-400 bg-red-50' : 'border-slate-300'
+                }`}
+              />
+              {retypeError && (
+                <p className="text-xs text-red-600">Not quite — check the spelling and try again.</p>
+              )}
+              <button
+                type="submit"
+                className="w-full rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
+              >
+                Continue
+              </button>
+            </form>
           )}
         </div>
       )}
