@@ -1,4 +1,5 @@
 import type { Card, CardProgress, LearnProgress, StudyDirection } from '../types';
+import { pickDistractors } from './distractors';
 
 /** Consecutive correct answers (across question types) needed to master a card. */
 export const MASTERY_STREAK = 2;
@@ -96,8 +97,8 @@ export function buildQuestion(
     return { cardId: card.id, type, prompt, answer };
   }
 
-  const distractorPool = allCards.filter((c) => c.id !== card.id).map((c) => c[answerField]);
-  const distractors = shuffle(distractorPool).slice(0, 3);
+  const candidatePool = allCards.filter((c) => c.id !== card.id);
+  const distractors = pickDistractors(card, candidatePool, answerField, 3);
   const choices = shuffle([answer, ...distractors]);
   return { cardId: card.id, type, prompt, answer, choices };
 }
