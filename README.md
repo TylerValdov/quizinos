@@ -40,24 +40,28 @@ You only do this once, as the project owner.
    These values are not secret — Firebase's client config is meant to be
    public; the security rules are what actually protect the data.
 
-## One-time setup: GitHub Pages
+## One-time setup: Vercel
 
-1. Push this folder to a GitHub repo.
-2. In the repo's **Settings → Pages**, set **Source** to **GitHub Actions**.
-3. In **Settings → Secrets and variables → Actions**, add one repository
-   secret for each value from step 6 above:
+1. Push this folder to a GitHub repo (any visibility — public or private both
+   work fine on Vercel's free plan).
+2. Go to [vercel.com/new](https://vercel.com/new), sign in with GitHub, and
+   import the repo. Vercel auto-detects Vite (build command `npm run build`,
+   output directory `dist`) — you don't need to change anything there.
+3. Before clicking **Deploy**, expand **Environment Variables** and add one
+   entry for each value from step 6 above:
    - `VITE_FIREBASE_API_KEY`
    - `VITE_FIREBASE_AUTH_DOMAIN`
    - `VITE_FIREBASE_PROJECT_ID`
    - `VITE_FIREBASE_STORAGE_BUCKET`
    - `VITE_FIREBASE_MESSAGING_SENDER_ID`
    - `VITE_FIREBASE_APP_ID`
-4. Push to `main` (or run the "Deploy to GitHub Pages" workflow manually from
-   the **Actions** tab) — [.github/workflows/deploy.yml](.github/workflows/deploy.yml)
-   builds the app with those secrets baked in and deploys `dist/` automatically.
+4. Click **Deploy**. Vercel gives the project its own free `*.vercel.app` URL,
+   unrelated to any other domain or project on your account — that's the link
+   to give your friend.
 
 The site uses a hash-based router (`#/sets/...`), so there's no extra
-rewrite/404 configuration needed for GitHub Pages' static hosting.
+rewrite/404 configuration needed on Vercel either. Any future push to the
+repo's default branch redeploys automatically.
 
 ## Local development
 
