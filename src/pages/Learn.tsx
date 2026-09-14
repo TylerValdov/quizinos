@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import { useSets } from '../context/SetsContext';
 import { useAuth } from '../context/AuthContext';
@@ -46,10 +46,18 @@ export default function Learn() {
   const [progressLoading, setProgressLoading] = useState(true);
 
   const [writtenInput, setWrittenInput] = useState('');
+  const [selectedChoice, setSelectedChoice] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<'correct' | 'incorrect' | null>(null);
   const [revealedAnswer, setRevealedAnswer] = useState<string | null>(null);
   const [locked, setLocked] = useState(false);
   const [sessionAnswers, setSessionAnswers] = useState(0);
+  const [canOverride, setCanOverride] = useState(false);
+
+  // Holds everything needed to advance once "Next question" is clicked, and
+  // to recompute the answer if it gets overridden to correct in the meantime.
+  const pendingQueueRef = useRef<string[] | null>(null);
+  const progressBeforeAnswerRef = useRef<LearnProgress | null>(null);
+  const baseQueueRef = useRef<string[] | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -76,6 +84,18 @@ export default function Learn() {
     [set, progress],
   );
 
+  const resetQuestionUi = useCallback(() => {
+    setWrittenInput('');
+    setSelectedChoice(null);
+    setFeedback(null);
+    setRevealedAnswer(null);
+    setCanOverride(false);
+    setLocked(false);
+    pendingQueueRef.current = null;
+    progressBeforeAnswerRef.current = null;
+    baseQueueRef.current = null;
+  }, []);
+
   const restart = useCallback(
     (direction: StudyDirection) => {
       if (!set || !uid) return;
@@ -83,13 +103,10 @@ export default function Learn() {
       const fresh = initLearnProgress(set.id, set.cards, direction);
       setProgress(fresh);
       setState(pickNext(set.cards, buildRoundQueue(set.cards, fresh), fresh));
-      setWrittenInput('');
-      setFeedback(null);
-      setRevealedAnswer(null);
-      setLocked(false);
+      resetQuestionUi();
       setSessionAnswers(0);
     },
-    [set, uid],
+    [set, uid, resetQuestionUi],
   );
 
   if (!set) {
@@ -118,14 +135,18 @@ export default function Learn() {
     return <div className="text-center text-slate-400 py-16 text-sm">Loading…</div>;
   }
 
-  function commitAnswer(correct: boolean, answerShown: string) {
+  function commitAnswer(correct: boolean, answerShown: string, allowOverride: boolean) {
     if (!state.question || locked || !progress || !set || !uid) return;
     setLocked(true);
     setFeedback(correct ? 'correct' : 'incorrect');
     setRevealedAnswer(answerShown);
+    setCanOverride(!correct && allowOverride);
     setSessionAnswers((n) => n + 1);
 
     const cardId = state.question.cardId;
+    progressBeforeAnswerRef.current = progress;
+    baseQueueRef.current = state.queue;
+
     const newProgress = recordAnswer(progress, cardId, correct);
     setProgress(newProgress);
     saveProgress(uid, newProgress);
@@ -135,33 +156,41 @@ export default function Learn() {
       const insertAt = Math.min(3, newQueue.length);
       newQueue = [...newQueue.slice(0, insertAt), cardId, ...newQueue.slice(insertAt)];
     }
-
-    window.setTimeout(
-      () => {
-        setState(pickNext(set.cards, newQueue, newProgress));
-        setWrittenInput('');
-        setFeedback(null);
-        setRevealedAnswer(null);
-        setLocked(false);
-      },
-      correct ? 500 : 1600,
-    );
+    pendingQueueRef.current = newQueue;
   }
 
   function handleChoiceClick(choice: string) {
     if (!state.question) return;
-    commitAnswer(choice === state.question.answer, state.question.answer);
+    setSelectedChoice(choice);
+    commitAnswer(choice === state.question.answer, state.question.answer, false);
   }
 
   function handleWrittenSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!state.question || !writtenInput.trim()) return;
-    commitAnswer(isAnswerCorrect(writtenInput, state.question.answer), state.question.answer);
+    commitAnswer(isAnswerCorrect(writtenInput, state.question.answer), state.question.answer, true);
   }
 
   function handleDontKnow() {
     if (!state.question) return;
-    commitAnswer(false, state.question.answer);
+    commitAnswer(false, state.question.answer, false);
+  }
+
+  function handleMarkCorrect() {
+    if (!state.question || !uid || !progressBeforeAnswerRef.current || !baseQueueRef.current) return;
+    const cardId = state.question.cardId;
+    const corrected = recordAnswer(progressBeforeAnswerRef.current, cardId, true);
+    setProgress(corrected);
+    saveProgress(uid, corrected);
+    setFeedback('correct');
+    setCanOverride(false);
+    pendingQueueRef.current = baseQueueRef.current;
+  }
+
+  function handleNext() {
+    if (!pendingQueueRef.current || !progress || !set) return;
+    setState(pickNext(set.cards, pendingQueueRef.current, progress));
+    resetQuestionUi();
   }
 
   const finished = !state.question;
@@ -229,17 +258,18 @@ export default function Learn() {
             <div className="grid gap-2">
               {state.question!.choices!.map((choice, i) => {
                 const isAnswer = choice === state.question!.answer;
-                const showState = feedback && (isAnswer || false);
+                const isSelected = choice === selectedChoice;
+                let style = 'border-slate-300 bg-white hover:border-brand';
+                if (feedback && isAnswer) style = 'border-green-500 bg-green-50';
+                else if (feedback === 'incorrect' && isSelected) style = 'border-red-400 bg-red-50';
                 return (
                   <button
                     key={i}
                     disabled={locked}
                     onClick={() => handleChoiceClick(choice)}
-                    className={`text-left rounded-md border px-4 py-3 text-sm transition ${
-                      showState
-                        ? 'border-green-500 bg-green-50'
-                        : 'border-slate-300 bg-white hover:border-brand'
-                    } ${locked ? 'cursor-default' : ''}`}
+                    className={`text-left rounded-md border px-4 py-3 text-sm transition ${style} ${
+                      locked ? 'cursor-default' : ''
+                    }`}
                   >
                     {choice}
                   </button>
@@ -284,12 +314,32 @@ export default function Learn() {
 
           {feedback && (
             <div
-              className={`mt-3 rounded-md px-4 py-2 text-sm ${
+              className={`mt-3 rounded-md px-4 py-2 text-sm flex items-center justify-between gap-3 flex-wrap ${
                 feedback === 'correct' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
               }`}
             >
-              {feedback === 'correct' ? 'Correct!' : `Not quite — the answer was "${revealedAnswer}"`}
+              <span>
+                {feedback === 'correct' ? 'Correct!' : `Not quite — the answer was "${revealedAnswer}"`}
+              </span>
+              {canOverride && (
+                <button
+                  onClick={handleMarkCorrect}
+                  className="rounded-md border border-red-300 bg-white px-3 py-1 text-xs font-medium text-red-700 hover:bg-red-100 whitespace-nowrap"
+                >
+                  This answer is correct
+                </button>
+              )}
             </div>
+          )}
+
+          {feedback && (
+            <button
+              onClick={handleNext}
+              autoFocus
+              className="mt-4 w-full rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
+            >
+              Next question →
+            </button>
           )}
         </div>
       )}
