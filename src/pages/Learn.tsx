@@ -14,7 +14,7 @@ import {
   type LearnQuestion,
 } from '../lib/learnEngine';
 import { isAnswerCorrect, isExactMatch } from '../lib/textMatch';
-import type { LearnProgress, StudyDirection } from '../types';
+import type { LearnProgress, QuestionMode, StudyDirection } from '../types';
 import type { Card } from '../types';
 
 interface QueueState {
@@ -70,7 +70,7 @@ export default function Learn() {
       if (cancelled) return;
       const prog = stored
         ? reconcileProgress(stored, set.cards)
-        : initLearnProgress(set.id, set.cards, 'term-to-def');
+        : initLearnProgress(set.id, set.cards, 'term-to-def', 'mixed');
       setProgress(prog);
       setState(pickNext(set.cards, buildRoundQueue(set.cards, prog), prog));
       setProgressLoading(false);
@@ -103,10 +103,10 @@ export default function Learn() {
   }, []);
 
   const restart = useCallback(
-    (direction: StudyDirection) => {
+    (direction: StudyDirection, questionMode: QuestionMode) => {
       if (!set || !uid) return;
       void clearProgress(uid, set.id);
-      const fresh = initLearnProgress(set.id, set.cards, direction);
+      const fresh = initLearnProgress(set.id, set.cards, direction, questionMode);
       setProgress(fresh);
       setState(pickNext(set.cards, buildRoundQueue(set.cards, fresh), fresh));
       resetQuestionUi();
@@ -220,14 +220,25 @@ export default function Learn() {
           ← {set.title}
         </Link>
         {!finished && (
-          <select
-            className="text-xs rounded-md border border-slate-300 px-2 py-1"
-            value={progress.direction}
-            onChange={(e) => restart(e.target.value as StudyDirection)}
-          >
-            <option value="term-to-def">Answer with definition</option>
-            <option value="def-to-term">Answer with term</option>
-          </select>
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              className="text-xs rounded-md border border-slate-300 px-2 py-1"
+              value={progress.questionMode}
+              onChange={(e) => restart(progress.direction, e.target.value as QuestionMode)}
+            >
+              <option value="mixed">Mixed (recommended)</option>
+              <option value="multiple-choice">Multiple choice only</option>
+              <option value="written">Written only (fill in the blank)</option>
+            </select>
+            <select
+              className="text-xs rounded-md border border-slate-300 px-2 py-1"
+              value={progress.direction}
+              onChange={(e) => restart(e.target.value as StudyDirection, progress.questionMode)}
+            >
+              <option value="term-to-def">Answer with definition</option>
+              <option value="def-to-term">Answer with term</option>
+            </select>
+          </div>
         )}
       </div>
 
@@ -247,7 +258,7 @@ export default function Learn() {
           </p>
           <div className="flex justify-center gap-3">
             <button
-              onClick={() => restart(progress.direction)}
+              onClick={() => restart(progress.direction, progress.questionMode)}
               className="rounded-md bg-brand px-4 py-2 text-sm font-medium text-white hover:bg-brand-dark"
             >
               Study again

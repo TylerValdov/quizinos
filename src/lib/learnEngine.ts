@@ -1,4 +1,4 @@
-import type { Card, CardProgress, LearnProgress, StudyDirection } from '../types';
+import type { Card, CardProgress, LearnProgress, QuestionMode, StudyDirection } from '../types';
 import { pickDistractors } from './distractors';
 
 /** Consecutive correct answers (across question types) needed to master a card. */
@@ -8,6 +8,7 @@ export function initLearnProgress(
   setId: string,
   cards: Card[],
   direction: StudyDirection,
+  questionMode: QuestionMode = 'mixed',
 ): LearnProgress {
   const progress: Record<string, CardProgress> = {};
   for (const c of cards) {
@@ -16,6 +17,7 @@ export function initLearnProgress(
   return {
     setId,
     direction,
+    questionMode,
     cards: progress,
     round: 1,
     roundsToMastery: MASTERY_STREAK,
@@ -23,7 +25,10 @@ export function initLearnProgress(
   };
 }
 
-/** Progress may be stale after cards were added/removed since the last session. */
+/**
+ * Progress may be stale after cards were added/removed since the last
+ * session — or come from before questionMode existed, so default it.
+ */
 export function reconcileProgress(progress: LearnProgress, cards: Card[]): LearnProgress {
   const next: Record<string, CardProgress> = {};
   for (const c of cards) {
@@ -34,7 +39,7 @@ export function reconcileProgress(progress: LearnProgress, cards: Card[]): Learn
       timesCorrect: 0,
     };
   }
-  return { ...progress, cards: next };
+  return { ...progress, cards: next, questionMode: progress.questionMode ?? 'mixed' };
 }
 
 export function activeCardIds(cards: Card[], progress: LearnProgress): string[] {
@@ -73,9 +78,12 @@ export interface LearnQuestion {
 }
 
 /**
- * A card is quizzed multiple-choice until its first correct answer, then
- * written for the rest of the way — mirrors Quizlet Learn's "recognize,
- * then recall" progression toward mastery.
+ * In "mixed" mode a card is quizzed multiple-choice until its first correct
+ * answer, then written for the rest of the way — mirrors Quizlet Learn's
+ * "recognize, then recall" progression toward mastery. "multiple-choice" and
+ * "written" modes lock every question to that one type instead; multiple
+ * choice still falls back to written when there aren't enough other cards
+ * in the set to build answer choices from.
  */
 export function buildQuestion(
   card: Card,
@@ -84,8 +92,14 @@ export function buildQuestion(
 ): LearnQuestion {
   const cp = progress.cards[card.id];
   const enoughCardsForChoices = allCards.length >= 4;
-  const type: QuestionType =
-    cp.correctStreak === 0 && enoughCardsForChoices ? 'multiple-choice' : 'written';
+  let type: QuestionType;
+  if (progress.questionMode === 'written') {
+    type = 'written';
+  } else if (progress.questionMode === 'multiple-choice') {
+    type = enoughCardsForChoices ? 'multiple-choice' : 'written';
+  } else {
+    type = cp.correctStreak === 0 && enoughCardsForChoices ? 'multiple-choice' : 'written';
+  }
 
   const [promptField, answerField]: ['term' | 'definition', 'term' | 'definition'] =
     progress.direction === 'term-to-def' ? ['term', 'definition'] : ['definition', 'term'];

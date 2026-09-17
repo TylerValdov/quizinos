@@ -24,9 +24,12 @@ export interface CardProgress {
 
 export type StudyDirection = 'term-to-def' | 'def-to-term';
 
+export type QuestionMode = 'mixed' | 'multiple-choice' | 'written';
+
 export interface LearnProgress {
   setId: string;
   direction: StudyDirection;
+  questionMode: QuestionMode;
   cards: Record<string, CardProgress>;
   round: number;
   roundsToMastery: number;
