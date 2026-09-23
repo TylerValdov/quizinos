@@ -141,13 +141,18 @@ export default function Learn() {
     return <div className="text-center text-slate-400 py-16 text-sm">Loading…</div>;
   }
 
-  function commitAnswer(correct: boolean, answerShown: string, allowOverride: boolean) {
+  function commitAnswer(
+    correct: boolean,
+    answerShown: string,
+    allowOverride: boolean,
+    requireRetype = true,
+  ) {
     if (!state.question || locked || !progress || !set || !uid) return;
     setLocked(true);
     setFeedback(correct ? 'correct' : 'incorrect');
     setRevealedAnswer(answerShown);
     setCanOverride(!correct && allowOverride);
-    setNeedsRetype(!correct);
+    setNeedsRetype(!correct && requireRetype);
     setSessionAnswers((n) => n + 1);
 
     const cardId = state.question.cardId;
@@ -181,6 +186,11 @@ export default function Learn() {
   function handleDontKnow() {
     if (!state.question) return;
     commitAnswer(false, state.question.answer, false);
+  }
+
+  function handleSkipQuestion() {
+    if (!state.question) return;
+    commitAnswer(false, state.question.answer, false, false);
   }
 
   function handleMarkCorrect() {
@@ -321,7 +331,7 @@ export default function Learn() {
                       : 'border-slate-300'
                 }`}
               />
-              <div className="flex gap-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   type="submit"
                   disabled={locked}
@@ -336,6 +346,14 @@ export default function Learn() {
                   className="rounded-md border border-slate-300 px-4 py-2 text-sm hover:bg-slate-50 disabled:opacity-50"
                 >
                   Don't know
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSkipQuestion}
+                  disabled={locked}
+                  className="rounded-md border border-slate-300 px-4 py-2 text-sm text-slate-500 hover:bg-slate-50 disabled:opacity-50"
+                >
+                  Skip
                 </button>
               </div>
             </form>
@@ -361,7 +379,7 @@ export default function Learn() {
             </div>
           )}
 
-          {feedback === 'correct' && (
+          {(feedback === 'correct' || (feedback === 'incorrect' && !needsRetype)) && (
             <button
               onClick={handleNext}
               autoFocus
@@ -391,12 +409,21 @@ export default function Learn() {
               {retypeError && (
                 <p className="text-xs text-red-600">Not quite — check the spelling and try again.</p>
               )}
-              <button
-                type="submit"
-                className="w-full rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
-              >
-                Continue
-              </button>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="submit"
+                  className="flex-1 rounded-md bg-brand px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-dark"
+                >
+                  Continue
+                </button>
+                <button
+                  type="button"
+                  onClick={handleNext}
+                  className="rounded-md border border-slate-300 px-4 py-2.5 text-sm text-slate-500 hover:bg-slate-50"
+                >
+                  Skip
+                </button>
+              </div>
             </form>
           )}
         </div>
