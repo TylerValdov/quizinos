@@ -280,7 +280,7 @@ export default function Learn() {
             <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
               {state.question!.type === 'multiple-choice' ? 'Choose the match' : 'Type the answer'}
             </p>
-            <p className="text-xl font-medium">{state.question!.prompt}</p>
+            <p className="text-xl font-medium whitespace-pre-line">{state.question!.prompt}</p>
           </div>
 
           {state.question!.type === 'multiple-choice' ? (
@@ -296,7 +296,7 @@ export default function Learn() {
                     key={i}
                     disabled={locked}
                     onClick={() => handleChoiceClick(choice)}
-                    className={`text-left rounded-md border px-4 py-3 text-sm transition ${style} ${
+                    className={`text-left rounded-md border px-4 py-3 text-sm transition whitespace-pre-line ${style} ${
                       locked ? 'cursor-default' : ''
                     }`}
                   >
@@ -343,11 +343,11 @@ export default function Learn() {
 
           {feedback && (
             <div
-              className={`mt-3 rounded-md px-4 py-2 text-sm flex items-center justify-between gap-3 flex-wrap ${
+              className={`mt-3 rounded-md px-4 py-2 text-sm flex items-start justify-between gap-3 flex-wrap ${
                 feedback === 'correct' ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'
               }`}
             >
-              <span>
+              <span className="whitespace-pre-line">
                 {feedback === 'correct' ? 'Correct!' : `Not quite — the answer was "${revealedAnswer}"`}
               </span>
               {canOverride && (

@@ -257,9 +257,10 @@ export default function SetEditor({ mode }: SetEditorProps) {
                   value={card.term}
                   onChange={(e) => handleCardChange(card.id, 'term', e.target.value)}
                 />
-                <input
-                  className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                <textarea
+                  className="rounded-md border border-slate-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-brand resize-y"
                   placeholder="Definition"
+                  rows={Math.max(1, card.definition.split('\n').length)}
                   value={card.definition}
                   onChange={(e) => handleCardChange(card.id, 'definition', e.target.value)}
                 />

@@ -58,8 +58,8 @@ export default function SetDetail() {
       <div className="rounded-xl border border-slate-200 bg-white divide-y">
         {set.cards.map((card) => (
           <div key={card.id} className="flex px-4 py-3 gap-4">
-            <span className="flex-1">{card.term}</span>
-            <span className="flex-1 text-slate-500">{card.definition}</span>
+            <span className="flex-1 whitespace-pre-line">{card.term}</span>
+            <span className="flex-1 text-slate-500 whitespace-pre-line">{card.definition}</span>
           </div>
         ))}
       </div>

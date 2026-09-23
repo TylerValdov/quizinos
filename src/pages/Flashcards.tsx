@@ -62,11 +62,11 @@ export default function Flashcards() {
         onClick={() => setFlipped((f) => !f)}
       >
         <div className={`flip-card-inner relative h-full w-full ${flipped ? 'flipped' : ''}`}>
-          <div className="flip-card-face absolute inset-0 flex items-center justify-center rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
-            <p className="text-center text-xl font-medium">{card?.term}</p>
+          <div className="flip-card-face absolute inset-0 flex items-center justify-center overflow-y-auto rounded-2xl border border-slate-200 bg-white p-8 shadow-sm">
+            <p className="text-center text-xl font-medium whitespace-pre-line">{card?.term}</p>
           </div>
-          <div className="flip-card-face back absolute inset-0 flex items-center justify-center rounded-2xl border border-brand bg-brand/5 p-8 shadow-sm">
-            <p className="text-center text-xl">{card?.definition}</p>
+          <div className="flip-card-face back absolute inset-0 flex items-center justify-center overflow-y-auto rounded-2xl border border-brand bg-brand/5 p-8 shadow-sm">
+            <p className="text-center text-xl whitespace-pre-line">{card?.definition}</p>
           </div>
         </div>
       </div>
