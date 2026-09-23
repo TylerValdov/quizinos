@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useSets, makeCard } from '../context/SetsContext';
 import type { Card } from '../types';
@@ -36,12 +36,73 @@ export default function SetEditor({ mode }: SetEditorProps) {
   const [cardSepCustom, setCardSepCustom] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState('');
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   useEffect(() => {
     if (mode === 'edit' && !existing) {
       navigate('/', { replace: true });
     }
   }, [mode, existing, navigate]);
+
+  // --- Autosave -----------------------------------------------------------
+  // Losing 100 hand-typed cards because a click landed on the wrong link is
+  // exactly the failure this exists to prevent: a set is created/updated in
+  // Firestore a moment after every edit, not only when "Create set" /
+  // "Save changes" is clicked. Refs (not context functions) back the save
+  // path so its identity never changes and the debounce effect only resets
+  // on real edits, not on every Firestore echo of our own writes.
+  const savedIdRef = useRef<string | null>(existing?.id ?? null);
+  const contextRef = useRef({ createSet, updateSet });
+  contextRef.current = { createSet, updateSet };
+  const latestRef = useRef({ title, description, cards });
+  latestRef.current = { title, description, cards };
+  const debounceTimerRef = useRef<number | null>(null);
+  const hasUnsavedChangesRef = useRef(false);
+  const skipFirstRef = useRef(true);
+
+  const flushSave = useCallback(() => {
+    const { title, description, cards } = latestRef.current;
+    const hasContent = title.trim() || cards.some((c) => c.term.trim() || c.definition.trim());
+    if (!hasContent) return;
+
+    const cardsToSave = cards.filter((c) => c.term.trim() || c.definition.trim());
+    const { createSet, updateSet } = contextRef.current;
+    if (savedIdRef.current) {
+      updateSet(savedIdRef.current, { title: title.trim() || 'Untitled set', description, cards: cardsToSave });
+    } else {
+      const created = createSet(title.trim() || 'Untitled set', description, cardsToSave);
+      savedIdRef.current = created.id;
+    }
+    hasUnsavedChangesRef.current = false;
+    setSaveStatus('saved');
+  }, []);
+
+  useEffect(() => {
+    if (skipFirstRef.current) {
+      skipFirstRef.current = false;
+      return;
+    }
+    hasUnsavedChangesRef.current = true;
+    setSaveStatus('saving');
+    if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = window.setTimeout(flushSave, 1000);
+    return () => {
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [title, description, cards]);
+
+  // Flush immediately on unmount (e.g. navigating away mid-debounce) instead
+  // of letting the pending timer above get cancelled with nothing saved.
+  useEffect(() => {
+    return () => {
+      if (hasUnsavedChangesRef.current) {
+        if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+        flushSave();
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const effectiveTermSep = termSepChoice === 'custom' ? termSepCustom : termSepChoice;
   const effectiveCardSep = cardSepChoice === 'custom' ? cardSepCustom : cardSepChoice;
@@ -97,9 +158,17 @@ export default function SetEditor({ mode }: SetEditorProps) {
       return;
     }
 
+    if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+    hasUnsavedChangesRef.current = false;
+
     if (mode === 'create') {
-      const created = createSet(title.trim(), description.trim(), cleanCards);
-      navigate(`/sets/${created.id}`);
+      if (savedIdRef.current) {
+        updateSet(savedIdRef.current, { title: title.trim(), description: description.trim(), cards: cleanCards });
+        navigate(`/sets/${savedIdRef.current}`);
+      } else {
+        const created = createSet(title.trim(), description.trim(), cleanCards);
+        navigate(`/sets/${created.id}`);
+      }
     } else if (existing) {
       updateSet(existing.id, { title: title.trim(), description: description.trim(), cards: cleanCards });
       navigate(`/sets/${existing.id}`);
@@ -109,6 +178,8 @@ export default function SetEditor({ mode }: SetEditorProps) {
   function handleDelete() {
     if (!existing) return;
     if (confirm(`Delete "${existing.title}"? This can't be undone.`)) {
+      if (debounceTimerRef.current) window.clearTimeout(debounceTimerRef.current);
+      hasUnsavedChangesRef.current = false;
       deleteSet(existing.id);
       navigate('/');
     }
@@ -116,7 +187,14 @@ export default function SetEditor({ mode }: SetEditorProps) {
 
   return (
     <div className="max-w-3xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">{mode === 'create' ? 'Create a set' : 'Edit set'}</h1>
+      <div className="flex items-center gap-3 mb-4">
+        <h1 className="text-2xl font-bold">{mode === 'create' ? 'Create a set' : 'Edit set'}</h1>
+        {saveStatus !== 'idle' && (
+          <span className="text-xs text-slate-400">
+            {saveStatus === 'saving' ? 'Saving…' : '✓ Saved'}
+          </span>
+        )}
+      </div>
 
       <div className="rounded-xl border border-slate-200 bg-white p-4 mb-4 space-y-3">
         <div>

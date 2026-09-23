@@ -1,9 +1,11 @@
 import type { ReactNode } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
 export default function Layout({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
+  const location = useLocation();
+  const onCreatePage = location.pathname === '/sets/new';
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -16,12 +18,19 @@ export default function Layout({ children }: { children: ReactNode }) {
             QuizletCopy
           </Link>
           <nav className="flex items-center gap-3 text-sm">
-            <Link
-              to="/sets/new"
-              className="rounded-md bg-brand px-3 py-1.5 font-medium text-white hover:bg-brand-dark"
-            >
-              + Create set
-            </Link>
+            {/* Outlined, not solid — this navigates to a fresh blank set and
+                shouldn't be mistaken for the actual save action on whichever
+                set is currently open below. Hidden entirely on the create
+                page itself, where it would just be a confusing duplicate of
+                the "Create set" button in the form. */}
+            {!onCreatePage && (
+              <Link
+                to="/sets/new"
+                className="rounded-md border border-brand text-brand px-3 py-1.5 font-medium hover:bg-brand/5"
+              >
+                + Create set
+              </Link>
+            )}
             {user && (
               <button
                 onClick={() => void signOut()}
@@ -36,7 +45,7 @@ export default function Layout({ children }: { children: ReactNode }) {
       </header>
       <main className="flex-1 max-w-5xl mx-auto w-full px-4 py-6">{children}</main>
       <footer className="text-center text-xs text-slate-400 py-6">
-        A study-only project, unaffiliated with Quizlet. All data stays in your browser.
+        A study-only project, unaffiliated with Quizlet. Private to your account.
       </footer>
     </div>
   );
