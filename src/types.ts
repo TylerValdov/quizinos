@@ -2,6 +2,8 @@ export interface Card {
   id: string;
   term: string;
   definition: string;
+  termImageId?: string;
+  definitionImageId?: string;
 }
 
 export interface StudySet {

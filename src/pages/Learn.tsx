@@ -14,6 +14,7 @@ import {
   type LearnQuestion,
 } from '../lib/learnEngine';
 import { isAnswerCorrect, isExactMatch } from '../lib/textMatch';
+import CardImage from '../components/CardImage';
 import type { LearnProgress, QuestionMode, StudyDirection } from '../types';
 import type { Card } from '../types';
 
@@ -290,6 +291,7 @@ export default function Learn() {
             <p className="text-xs uppercase tracking-wide text-slate-400 mb-2">
               {state.question!.type === 'multiple-choice' ? 'Choose the match' : 'Type the answer'}
             </p>
+            <CardImage imageId={state.question!.promptImageId} className="max-h-48 mb-3" />
             <p className="text-xl font-medium whitespace-pre-line">{state.question!.prompt}</p>
           </div>
 

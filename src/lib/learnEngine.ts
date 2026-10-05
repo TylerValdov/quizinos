@@ -73,6 +73,7 @@ export interface LearnQuestion {
   cardId: string;
   type: QuestionType;
   prompt: string;
+  promptImageId?: string;
   answer: string;
   choices?: string[];
 }
@@ -105,16 +106,17 @@ export function buildQuestion(
     progress.direction === 'term-to-def' ? ['term', 'definition'] : ['definition', 'term'];
 
   const prompt = card[promptField];
+  const promptImageId = promptField === 'term' ? card.termImageId : card.definitionImageId;
   const answer = card[answerField];
 
   if (type === 'written') {
-    return { cardId: card.id, type, prompt, answer };
+    return { cardId: card.id, type, prompt, promptImageId, answer };
   }
 
   const candidatePool = allCards.filter((c) => c.id !== card.id);
   const distractors = pickDistractors(card, candidatePool, answerField, 3);
   const choices = shuffle([answer, ...distractors]);
-  return { cardId: card.id, type, prompt, answer, choices };
+  return { cardId: card.id, type, prompt, promptImageId, answer, choices };
 }
 
 export function recordAnswer(progress: LearnProgress, cardId: string, correct: boolean): LearnProgress {

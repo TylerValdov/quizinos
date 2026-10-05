@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useSets, makeCard } from '../context/SetsContext';
+import { useAuth } from '../context/AuthContext';
 import type { Card } from '../types';
 import {
   CARD_SEPARATORS,
   TERM_SEPARATORS,
   parseImportText,
 } from '../lib/importParser';
+import { compressImage, saveImage } from '../lib/images';
+import CardImage from '../components/CardImage';
 
 interface SetEditorProps {
   mode: 'create' | 'edit';
@@ -15,6 +18,7 @@ interface SetEditorProps {
 export default function SetEditor({ mode }: SetEditorProps) {
   const { id } = useParams();
   const { getSet, createSet, updateSet, deleteSet } = useSets();
+  const { user } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -114,6 +118,30 @@ export default function SetEditor({ mode }: SetEditorProps) {
 
   function addCardRow() {
     setCards((prev) => [...prev, makeCard('', '')]);
+  }
+
+  async function handleCardImage(cardId: string, side: 'term' | 'definition', file: File) {
+    if (!user) return;
+    try {
+      const dataUrl = await compressImage(file);
+      const imageId = saveImage(user.uid, dataUrl);
+      const key = side === 'term' ? 'termImageId' : 'definitionImageId';
+      setCards((prev) => prev.map((c) => (c.id === cardId ? { ...c, [key]: imageId } : c)));
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not add that image.');
+    }
+  }
+
+  function removeCardImage(cardId: string, side: 'term' | 'definition') {
+    const key = side === 'term' ? 'termImageId' : 'definitionImageId';
+    setCards((prev) =>
+      prev.map((c) => {
+        if (c.id !== cardId) return c;
+        const { [key]: _removed, ...rest } = c;
+        return rest;
+      }),
+    );
   }
 
   function removeCardRow(cardId: string) {
@@ -264,6 +292,39 @@ export default function SetEditor({ mode }: SetEditorProps) {
                   value={card.definition}
                   onChange={(e) => handleCardChange(card.id, 'definition', e.target.value)}
                 />
+                {(['term', 'definition'] as const).map((side) => {
+                  const imageId = side === 'term' ? card.termImageId : card.definitionImageId;
+                  return (
+                    <div key={side} className="sm:col-span-1 text-xs">
+                      {imageId ? (
+                        <div className="space-y-1">
+                          <CardImage imageId={imageId} className="max-h-24" />
+                          <button
+                            type="button"
+                            onClick={() => removeCardImage(card.id, side)}
+                            className="text-slate-400 hover:text-red-500"
+                          >
+                            Remove {side} image
+                          </button>
+                        </div>
+                      ) : (
+                        <label className="inline-block cursor-pointer text-slate-500 hover:text-brand">
+                          + {side === 'term' ? 'Term' : 'Definition'} image
+                          <input
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              e.target.value = '';
+                              if (file) void handleCardImage(card.id, side, file);
+                            }}
+                          />
+                        </label>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
               <button
                 onClick={() => removeCardRow(card.id)}

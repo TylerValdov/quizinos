@@ -1,5 +1,6 @@
 import { Link, useNavigate, useParams } from 'react-router-dom';
 import { useSets } from '../context/SetsContext';
+import CardImage from '../components/CardImage';
 
 export default function SetDetail() {
   const { id } = useParams();
@@ -58,8 +59,14 @@ export default function SetDetail() {
       <div className="rounded-xl border border-slate-200 bg-white divide-y">
         {set.cards.map((card) => (
           <div key={card.id} className="flex px-4 py-3 gap-4">
-            <span className="flex-1 whitespace-pre-line">{card.term}</span>
-            <span className="flex-1 text-slate-500 whitespace-pre-line">{card.definition}</span>
+            <div className="flex-1 space-y-2">
+              <span className="block whitespace-pre-line">{card.term}</span>
+              <CardImage imageId={card.termImageId} className="max-h-24" />
+            </div>
+            <div className="flex-1 space-y-2 text-slate-500">
+              <span className="block whitespace-pre-line">{card.definition}</span>
+              <CardImage imageId={card.definitionImageId} className="max-h-24" />
+            </div>
           </div>
         ))}
       </div>
